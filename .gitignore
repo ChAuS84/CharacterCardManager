@@ -1,0 +1,15 @@
+# Build outputs
+bin/
+obj/
+.vs/
+
+# Local runtime databases & WebView2 session data (contains personal auth tokens)
+*.db
+*.db-shm
+*.db-wal
+webview_data/
+.cardmanager/
+
+# Local character card collections
+SFWCards/
+*.png

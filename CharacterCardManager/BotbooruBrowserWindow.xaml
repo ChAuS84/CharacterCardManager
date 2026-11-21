@@ -1,0 +1,291 @@
+<Window x:Class="CharacterCardManager.BotbooruBrowserWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:helpers="clr-namespace:CharacterCardManager.Helpers"
+        Title="Browse Botbooru"
+        Icon="app.ico"
+        Width="1440" Height="860"
+        MinWidth="980" MinHeight="620"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BgDeepBrush}"
+        Foreground="{StaticResource TextMainBrush}">
+
+    <Window.Resources>
+        <helpers:HexToBrushConverter x:Key="HexToBrush"/>
+        <helpers:RemoteThumbnailConverter x:Key="RemoteThumbConverter"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Top Search & Batch Action Bar -->
+        <Border Grid.Row="0" Background="{StaticResource BgPanelBrush}"
+                BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="0,0,0,1"
+                Padding="14,10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Row 0: Search + Sort + Search Button -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Grid Grid.Column="0">
+                        <TextBox x:Name="TxtQuery" KeyDown="TxtQuery_KeyDown"/>
+                        <TextBlock Text="Search Botbooru (e.g. scenarios:angst copyright:original -nsfl)..."
+                                   Foreground="{StaticResource TextMutedBrush}"
+                                   IsHitTestVisible="False" VerticalAlignment="Center" Margin="10,0,0,0">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Text, ElementName=TxtQuery}" Value="">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+
+                    <ComboBox Grid.Column="2" x:Name="CmbSort" SelectedIndex="0" SelectionChanged="FilterOption_Changed">
+                        <ComboBoxItem Content="Latest" Tag="latest"/>
+                        <ComboBoxItem Content="Most Downloaded" Tag="downloads"/>
+                        <ComboBoxItem Content="Most Viewed" Tag="views"/>
+                        <ComboBoxItem Content="Most Favorited" Tag="favorites"/>
+                        <ComboBoxItem Content="Oldest" Tag="oldest"/>
+                    </ComboBox>
+
+                    <Button Grid.Column="4" Content="Search" Style="{StaticResource AccentButtonStyle}"
+                            Padding="16,6" Click="Search_Click"/>
+
+                    <Button Grid.Column="6" x:Name="BtnDownloadSelected" Content="Download Selected (0)"
+                            Style="{StaticResource VioletButtonStyle}" IsEnabled="False"
+                            Click="DownloadSelected_Click"/>
+                </Grid>
+
+                <!-- Row 2: Checkboxes + Batch Select Helpers -->
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <CheckBox x:Name="ChkSfwOnly" Content="SFW Only" Foreground="{StaticResource TextMainBrush}"
+                                  Margin="0,0,16,0" Checked="FilterOption_Changed" Unchecked="FilterOption_Changed"/>
+                        <CheckBox x:Name="ChkHideAi" Content="Hide AI" Foreground="{StaticResource TextMainBrush}"
+                                  Margin="0,0,16,0" Checked="FilterOption_Changed" Unchecked="FilterOption_Changed"/>
+                        <CheckBox x:Name="ChkHideInFolder" Content="Hide Already in Folder" Foreground="{StaticResource TextMainBrush}"
+                                  Checked="HideInFolder_Changed" Unchecked="HideInFolder_Changed"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button Content="Select All Missing" Style="{StaticResource DarkButtonStyle}"
+                                Padding="10,4" Margin="0,0,6,0" Click="SelectAllMissing_Click"/>
+                        <Button Content="Clear Checks" Style="{StaticResource DarkButtonStyle}"
+                                Padding="10,4" Click="ClearChecks_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- Main Split View -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="5"/>
+                <ColumnDefinition Width="380" MinWidth="300" MaxWidth="520"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Left: Infinite-Scroll Results Grid -->
+            <ScrollViewer Grid.Column="0" x:Name="ScrollResults"
+                          VerticalScrollBarVisibility="Auto"
+                          ScrollChanged="ScrollResults_ScrollChanged"
+                          PreviewMouseWheel="ScrollResults_PreviewMouseWheel"
+                          Padding="10">
+                <StackPanel>
+                    <ItemsControl x:Name="ItemsResults">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Width="184" Margin="5" CornerRadius="6"
+                                        Background="{StaticResource BgCardBrush}"
+                                        BorderBrush="{Binding CardBorderHex, Converter={StaticResource HexToBrush}}"
+                                        BorderThickness="{Binding CardBorderThickness}">
+                                    <StackPanel>
+                                        <!-- Image + CheckBox + In Folder Badge (Click image to toggle check) -->
+                                        <Grid Height="224" Cursor="Hand" Background="Transparent"
+                                              Tag="{Binding}" MouseLeftButtonUp="ResultImage_Click"
+                                              ToolTip="Click image to check / uncheck">
+                                            <Border CornerRadius="5,5,0,0" Background="{StaticResource BgFieldBrush}" ClipToBounds="True">
+                                                <Image Source="{Binding ThumbnailUrl, Converter={StaticResource RemoteThumbConverter}, ConverterParameter=200}" Stretch="UniformToFill"/>
+                                            </Border>
+
+                                            <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}"
+                                                      HorizontalAlignment="Left" VerticalAlignment="Top"
+                                                      Margin="7" Padding="2"
+                                                      Click="CardCheckBox_Click"/>
+
+                                            <Border Background="#CC161620" BorderBrush="{StaticResource AccentPosBrush}"
+                                                    BorderThickness="1" CornerRadius="4"
+                                                    HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                    Margin="7" Padding="5,2"
+                                                    Visibility="{Binding IsInFolder, Converter={StaticResource BoolToVis}}">
+                                                <TextBlock Text="✓ In Folder" Foreground="{StaticResource AccentPosBrush}"
+                                                           FontSize="10" FontWeight="Bold"/>
+                                            </Border>
+                                        </Grid>
+
+                                        <!-- Card Info (Click below image to inspect details) -->
+                                        <StackPanel Margin="8,6,8,8" Background="Transparent" Cursor="Hand"
+                                                    Tag="{Binding}" MouseLeftButtonUp="ResultCard_Click"
+                                                    ToolTip="Click to view card details">
+                                            <TextBlock Text="{Binding CharacterName}" FontWeight="SemiBold" FontSize="12.5"
+                                                       TextTrimming="CharacterEllipsis" ToolTip="{Binding CharacterName}"/>
+                                            <Grid Margin="0,3,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{Binding StatsLine}"
+                                                           Foreground="{StaticResource TextMutedBrush}" FontSize="11"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding IdDisplay}"
+                                                           Foreground="{StaticResource AccentSeedBrush}" FontSize="11" FontWeight="SemiBold"/>
+                                            </Grid>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Border x:Name="BorderEndOfResults" Visibility="Collapsed"
+                            Background="{StaticResource BgPanelBrush}"
+                            BorderBrush="{StaticResource BorderSubtleBrush}"
+                            BorderThickness="1" CornerRadius="6"
+                            Margin="5,12,5,6" Padding="12,8">
+                        <TextBlock x:Name="TxtEndOfResults"
+                                   Text="— Reached the end of search results —"
+                                   Foreground="{StaticResource TextMutedBrush}"
+                                   FontSize="12" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center"/>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch"
+                          Background="{StaticResource BgPanelBrush}" Cursor="SizeWE"/>
+
+            <!-- Right: Selected Card Inspector -->
+            <Border Grid.Column="2" Background="{StaticResource BgPanelBrush}"
+                    BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1,0,0,0">
+                <Grid>
+                    <TextBlock x:Name="TxtEmptyInspector"
+                               Text="Click any card on the left to inspect its details, tags, and download individually."
+                               Foreground="{StaticResource TextMutedBrush}" FontSize="13"
+                               TextWrapping="Wrap" TextAlignment="Center"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24"/>
+
+                    <ScrollViewer x:Name="InspectorScroll" Visibility="Collapsed"
+                                  VerticalScrollBarVisibility="Auto" Padding="14">
+                        <StackPanel>
+                            <Border Height="260" CornerRadius="6" Background="{StaticResource BgFieldBrush}"
+                                    ClipToBounds="True" Margin="0,0,0,10" Cursor="Hand"
+                                    ToolTip="Click to view full-size image"
+                                    MouseLeftButtonUp="InspectorImage_Click">
+                                <Image x:Name="ImgInspector" Stretch="Uniform"/>
+                            </Border>
+
+                            <TextBlock x:Name="TxtInspName" FontSize="18" FontWeight="Bold" TextWrapping="Wrap"/>
+                            <TextBlock x:Name="TxtInspTagline" FontSize="12.5" FontStyle="Italic"
+                                       Foreground="#B4B4D0" TextWrapping="Wrap" Margin="0,4,0,0"/>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,6,0,4">
+                                <TextBlock x:Name="TxtInspStats" Foreground="{StaticResource TextMutedBrush}" FontSize="11.5"/>
+                                <TextBlock x:Name="TxtInspLink" Margin="10,0,0,0"
+                                           Foreground="{StaticResource AccentSeedBrush}" FontSize="11.5"
+                                           FontWeight="SemiBold" TextDecorations="Underline" Cursor="Hand"
+                                           MouseLeftButtonUp="InspLink_Click"/>
+                            </StackPanel>
+
+                            <Button x:Name="BtnInspDownload" Content="Download to Folder"
+                                    Style="{StaticResource AccentButtonStyle}"
+                                    Margin="0,8,0,12" Padding="12,7"
+                                    Click="DownloadSingle_Click"/>
+
+                            <TextBlock Text="TAGS (click to search, right-click to exclude)"
+                                       Foreground="{StaticResource AccentPosBrush}" FontSize="11" FontWeight="Bold"
+                                       Margin="0,0,0,6"/>
+
+                            <ItemsControl x:Name="ItemsInspTags" Margin="0,0,0,12">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{StaticResource BgCardBrush}"
+                                                BorderBrush="{Binding ColorHex, Converter={StaticResource HexToBrush}}"
+                                                BorderThickness="1" CornerRadius="4"
+                                                Margin="0,0,5,5" Padding="6,2" Cursor="Hand">
+                                            <TextBlock Text="{Binding Name}"
+                                                       Foreground="{Binding ColorHex, Converter={StaticResource HexToBrush}}"
+                                                       FontSize="11"
+                                                       Tag="{Binding}"
+                                                       MouseLeftButtonUp="InspTag_LeftClick"
+                                                       MouseRightButtonUp="InspTag_RightClick"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Text="DESCRIPTION EXCERPT"
+                                       Foreground="{StaticResource TextMutedBrush}" FontSize="11" FontWeight="Bold"
+                                       Margin="0,0,0,4"/>
+                            <TextBox x:Name="TxtInspDesc" IsReadOnly="True" TextWrapping="Wrap"
+                                     Background="{StaticResource BgFieldBrush}" BorderThickness="1"
+                                     Padding="8" FontSize="12" MaxHeight="260" VerticalScrollBarVisibility="Auto"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Bottom Status Bar -->
+        <Border Grid.Row="2" Background="{StaticResource BgPanelBrush}"
+                BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="0,1,0,0"
+                Padding="14,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="TxtStatus" Text="Loading latest cards..." Foreground="{StaticResource TextMutedBrush}" FontSize="12"/>
+                <TextBlock Grid.Column="1" x:Name="TxtTotalCount" Text="" Foreground="{StaticResource AccentPosBrush}" FontSize="12" FontWeight="SemiBold"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
