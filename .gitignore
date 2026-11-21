@@ -1,6 +1,7 @@
 # Build outputs
 bin/
 obj/
+publish/
 .vs/
 
 # Local runtime databases & WebView2 session data (contains personal auth tokens)
