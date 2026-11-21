@@ -13,3 +13,6 @@ webview_data/
 # Local character card collections
 SFWCards/
 *.png
+
+# Local agent instructions
+AGENTS.md

@@ -40,7 +40,7 @@ A fast, portable Windows desktop manager for **TavernAI / SillyTavern** characte
 * **Microsoft Edge WebView2 Runtime** (pre-installed on Windows 10/11)
 
 ```powershell
-git clone <your-repo-url>
+git clone https://github.com/ChAuS84/CharacterCardManager.git
 cd CharacterCardManager
 dotnet run --project CharacterCardManager\CharacterCardManager.csproj
 ```
